@@ -4,6 +4,23 @@ com.mybedy.antiradar
 air.StrelkaHUDFREE
 ru.encars.lixiangtweaks
 com.carWizard.li.swmb
-com.touchtype.swiftkey
+ru.yandex.yandexnavi
+ru.yandex.music
+ru.yandex.yandexmaps
+ru.dublgis.dgismobile
+com.maxxt.pcradio
+com.carwizard.li.youtube
 # Другие пользователи
 com.touchtype.swiftkey
+ru.kinopoisk
+ru.fmplay
+com.infolink.limeiptv
+com.spotify.music
+mobi.zona
+mobi.infolife.uninstaller
+com.vk.vkvideo
+com.androidapp.settings
+com.yandex.browser
+org.telegram.messenger
+com.rovio.angrybirds
+uk.co.aifactory.chessfree

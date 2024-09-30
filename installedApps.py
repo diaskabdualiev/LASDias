@@ -6,6 +6,44 @@ import commentjson as json  # Используем commentjson для разбо
 from colorama import Fore, Style, init
 from tqdm import tqdm  # Модуль для прогресс-бара
 
+special_apps = [
+    {
+        "package_name": "com.carWizard.li.swmb",
+        "permissions": [
+            "android.permission.REQUEST_INSTALL_PACKAGES",
+            "android.permission.WRITE_SECURE_SETTINGS"
+        ],
+        "additional_commands": [
+            {"cmd": "appops set com.carWizard.li.swmb REQUEST_INSTALL_PACKAGES allow"}
+        ]
+    },
+    {
+        "package_name": "ru.encars.lixiangtweaks",
+        "permissions": [
+            "android.permission.SYSTEM_ALERT_WINDOW"
+        ],
+        "additional_commands": []
+    },
+    {
+        "package_name": "air.StrelkaHUDFREE",
+        "permissions": [
+            "android.permission.SYSTEM_ALERT_WINDOW"
+        ],
+        "additional_commands": [
+            {"cmd": "dumpsys deviceidle whitelist +air.StrelkaHUDFREE"}
+        ]
+    },
+    {
+        "package_name": "com.mybedy.antiradar",
+        "permissions": [
+            "android.permission.SYSTEM_ALERT_WINDOW"
+        ],
+        "additional_commands": [
+            {"cmd": "dumpsys deviceidle whitelist +com.mybedy.antiradar"}
+        ]
+    }
+]
+
 # Инициализируем colorama
 init(autoreset=True)
 
@@ -332,12 +370,12 @@ def install_applications(device):
     print(Fore.CYAN + f"Пакеты для других пользователей: {other_users_packages}")
 
     # Проверка на пересечение пакетов между списками
-    overlapping_packages = set(user0_packages) & set(other_users_packages)
-    if overlapping_packages:
-        print(Fore.RED + f"Ошибка: следующие пакеты указаны для установки и для пользователя 0, и для других пользователей: {', '.join(overlapping_packages)}")
-        # Решение: удалить пересекающиеся пакеты из списка других пользователей
-        other_users_packages = [pkg for pkg in other_users_packages if pkg not in overlapping_packages]
-        print(Fore.YELLOW + f"Удалены пересекающиеся пакеты из других пользователей: {', '.join(overlapping_packages)}")
+    # overlapping_packages = set(user0_packages) & set(other_users_packages)
+    # if overlapping_packages:
+    #     print(Fore.RED + f"Ошибка: следующие пакеты указаны для установки и для пользователя 0, и для других пользователей: {', '.join(overlapping_packages)}")
+    #     # Решение: удалить пересекающиеся пакеты из списка других пользователей
+    #     other_users_packages = [pkg for pkg in other_users_packages if pkg not in overlapping_packages]
+    #     print(Fore.YELLOW + f"Удалены пересекающиеся пакеты из других пользователей: {', '.join(overlapping_packages)}")
     
     apk_folder = 'apk'
     if not os.path.exists(apk_folder):
@@ -412,13 +450,91 @@ def install_applications(device):
                     print(Fore.RED + f"Не удалось установить {package_name} для пользователя {user_id}")
                     continue
 
+def check_special_permissions(device):
+    """Проверяет, выданы ли специальные разрешения указанным приложениям."""
+    for app in special_apps:
+        package_name = app["package_name"]
+        permissions = app["permissions"]
+        
+        print(Fore.CYAN + f"\nПроверка разрешений для приложения {package_name}:")
+        
+        for permission in permissions:
+            # Проверяем статус разрешения через appops
+            print(Fore.YELLOW + f"Проверка разрешения {permission}...")
+            # Используем команду appops get для проверки разрешений
+            # Некоторые разрешения могут требовать специального подхода
+            result = subprocess.run(['adb', '-s', device, 'shell', 'appops', 'get', package_name, permission, '--user', '0'],
+                                    stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            if result.returncode != 0:
+                print(Fore.RED + f"Ошибка при проверке разрешения {permission}: {result.stderr.strip()}")
+                continue
+            output = result.stdout.strip()
+            if 'allow' in output:
+                print(Fore.GREEN + f"Разрешение {permission} выдано.")
+            elif 'deny' in output:
+                print(Fore.RED + f"Разрешение {permission} отклонено.")
+            else:
+                print(Fore.YELLOW + f"Разрешение {permission} не установлено.")
+        
+        # Проверка дополнительных команд, например, whitelist
+        additional_commands = app.get("additional_commands", [])
+        for command in additional_commands:
+            if 'whitelist' in command["cmd"]:
+                # Извлекаем пакет из команды
+                match = re.search(r'whitelist \+?(\S+)', command["cmd"])
+                if match:
+                    pkg = match.group(1)
+                    print(Fore.YELLOW + f"Проверка whitelist для {pkg}...")
+                    # Проверяем, добавлен ли пакет в whitelist
+                    result = subprocess.run(['adb', '-s', device, 'shell', 'dumpsys', 'deviceidle', 'whitelist'],
+                                            stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+                    if result.returncode != 0:
+                        print(Fore.RED + f"Ошибка при проверке whitelist: {result.stderr.strip()}")
+                        continue
+                    if pkg in result.stdout:
+                        print(Fore.GREEN + f"{pkg} находится в whitelist.")
+                    else:
+                        print(Fore.RED + f"{pkg} НЕ находится в whitelist.")
+    print(Fore.CYAN + "\nПроверка специальных разрешений завершена.")
+
+def grant_special_permissions(device):
+    """Выдает специальные разрешения указанным приложениям."""
+    for app in special_apps:
+        package_name = app["package_name"]
+        permissions = app["permissions"]
+        additional_commands = app.get("additional_commands", [])
+        
+        print(Fore.CYAN + f"\nВыдача разрешений для приложения {package_name}:")
+        
+        # Выдача стандартных разрешений
+        for permission in permissions:
+            print(Fore.YELLOW + f"Выдача разрешения {permission}...")
+            result = subprocess.run(['adb', '-s', device, 'shell', 'pm', 'grant', package_name, permission],
+                                    stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            if result.returncode == 0:
+                print(Fore.GREEN + f"Разрешение {permission} выдано.")
+            else:
+                print(Fore.RED + f"Ошибка при выдаче разрешения {permission}: {result.stderr.strip()}")
+        
+        # Выполнение дополнительных команд
+        for command in additional_commands:
+            cmd_str = command["cmd"]
+            print(Fore.YELLOW + f"Выполнение команды: adb shell {cmd_str}")
+            cmd_parts = ['adb', '-s', device, 'shell'] + cmd_str.split()
+            result = subprocess.run(cmd_parts, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            if result.returncode == 0:
+                print(Fore.GREEN + "Команда выполнена успешно.")
+            else:
+                print(Fore.RED + f"Ошибка при выполнении команды: {result.stderr.strip()}")
+
+
 
 def main():
     # Информация о приложениях
     apps = {
         'liapp': {
             'package_name': 'com.lixiang.chat.store',
-            'permission': 'REQUEST_INSTALL_PACKAGES',
+            'permission': 'android.permission.REQUEST_INSTALL_PACKAGES',
             'config_url': 'https://store.anyapp.tech/liappstore/config.json',
             'apk_filename_template': 'liapp-{version}.apk',
             'version_key': 'version',
@@ -426,11 +542,14 @@ def main():
         },
         'rustore': {
             'package_name': 'ru.vk.store',
-            'permission': 'REQUEST_INSTALL_PACKAGES',
+            'permission': 'android.permission.REQUEST_INSTALL_PACKAGES',
             'apk_url': 'https://static.rustore.ru/release/RuStore.apk',
             'apk_filename': 'RuStore.apk'
         }
     }
+
+    # Список специальных приложений (добавьте этот список вне функции main() или в глобальной области видимости)
+
 
     devices = get_connected_devices()
     device = select_device(devices)
@@ -447,6 +566,8 @@ def main():
         print("8: Установка приложений")
         print("9: Смена клавиатуры")
         print("10: Выход")
+        print("11: Выдать специальные разрешения приложениям")
+        print("12: Проверить специальные разрешения приложениям")
         choice = input("Введите номер действия: ")
 
         if choice == '1':
@@ -613,6 +734,14 @@ def main():
         elif choice == '10':
             print(Fore.CYAN + "Выход из программы.")
             break
+
+        elif choice == '11':
+            # Выдать специальные разрешения приложениям
+            grant_special_permissions(device)
+
+        elif choice == '12':
+            # Проверить специальные разрешения приложениям
+            check_special_permissions(device)
 
         else:
             print(Fore.RED + "Неверный выбор действия.")
