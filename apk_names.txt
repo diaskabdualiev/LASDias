@@ -1,0 +1,9 @@
+# Пользователь 0
+com.anyapp.launcher
+com.mybedy.antiradar
+air.StrelkaHUDFREE
+ru.encars.lixiangtweaks
+com.carWizard.li.swmb
+com.touchtype.swiftkey
+# Другие пользователи
+com.touchtype.swiftkey
